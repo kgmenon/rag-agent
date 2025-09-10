@@ -1,0 +1,10 @@
+target/
+*.jar
+lambda-layer.zip
+.terraform/
+terraform.tfstate*
+terraform.tfvars
+.DS_Store
+*.log
+*.class
+.vscode/
