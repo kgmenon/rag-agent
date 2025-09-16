@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Document Q&A Agent</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>RAG Document Q&A Agent</h1>
+            <p>Upload documents and ask questions about their content</p>
+        </header>
+
+        <main>
+            <div class="panels">
+                <!-- Upload Panel -->
+                <div class="panel upload-panel">
+                    <h2>Upload Documents</h2>
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-content">
+                            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7,10 12,15 17,10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <p>Drop files here or <span class="browse-text">browse</span></p>
+                            <input type="file" id="fileInput" multiple accept=".pdf,.txt,.doc,.docx,.md">
+                            <div class="upload-guidelines">
+                                <div class="size-limit">📏 <strong>Max file size: 50MB</strong></div>
+                                <div class="supported-types">
+                                    📄 Supported: PDF, TXT, DOC, DOCX, Markdown
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-info">
+                            <span id="progressText">Uploading...</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Backup Upload Button -->
+                    <div style="text-align: center; margin: 20px 0;">
+                        <button id="backupUploadBtn" onclick="document.getElementById('fileInput').click()" style="
+                            background: #667eea;
+                            color: white;
+                            padding: 12px 24px;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            cursor: pointer;
+                            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.background='#5a6fd8'; this.style.transform='translateY(-2px)'" onmouseout="this.style.background='#667eea'; this.style.transform='translateY(0)'">
+                            📁 Choose Files to Upload
+                        </button>
+                        <p style="font-size: 14px; color: #666; margin-top: 10px;">
+                            <strong>Alternative:</strong> Click the upload area above or use this button
+                        </p>
+                    </div>
+
+                    <div class="uploaded-files" id="uploadedFiles"></div>
+                </div>
+
+                <!-- Chat Panel -->
+                <div class="panel chat-panel">
+                    <h2>Ask Questions</h2>
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="welcome-message">
+                                <p>Welcome! Upload some documents and then ask questions about their content.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-input-area">
+                            <div class="input-container">
+                                <input type="text" id="queryInput" placeholder="Ask a question about your documents..." disabled>
+                                <button id="sendButton" disabled>Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="error-modal" id="errorModal" style="display: none;">
+        <div class="error-content">
+            <h3>Error</h3>
+            <p id="errorMessage"></p>
+            <button onclick="hideError()">Close</button>
+        </div>
+    </div>
+
+    <script src="app.js?v=20250912-1058"></script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+{
+    "apiBaseUrl": "http://rag-agent-poc-alb-696041964.ap-southeast-2.elb.amazonaws.com"
+}

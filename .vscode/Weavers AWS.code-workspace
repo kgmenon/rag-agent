@@ -1,0 +1,43 @@
+{
+	"folders": [
+		{
+			"name": "Weavers AWS",
+			"path": "../../Weavers AWS"
+		}
+	],
+	"settings": {
+		"yaml.customTags": [
+		
+			"!And sequence",
+			"!Base64 scalar",
+			"!Cidr scalar",
+			"!Equals sequence",
+			"!FindInMap sequence",
+			"!GetAtt scalar",
+			"!GetAtt sequence",
+			"!GetAZs scalar",
+			"!If sequence",
+			"!ImportValue scalar",
+			"!Join sequence",
+			"!Not sequence",
+			"!Or sequence",
+			"!Ref scalar",
+			"!Select sequence",
+			"!Split sequence",
+			"!Sub scalar",
+			"!Transform mapping",
+			"!Condition scalar"
+		],
+		"yaml.schemas": {
+			// "https://raw.githubusercontent.com/awslabs/goformation/master/schema/cloudformation.schema.json": [
+			// 	"*.yaml"
+			// ],
+	// 		"https://raw.githubusercontent.com/microsoft/azure-pipelines-vscode/master/service-schema.json": [
+    //   "azure-pipelines.yml",
+    //   "**/*pipeline*.yml",
+    //   "**/*pipeline*.yaml",
+    //   "**/pipelines/*.yml",
+    //   "**/pipelines/*.yaml"		] 
+	}
+	}
+}
