@@ -1,7 +1,6 @@
 package com.rag.agent.services;
 
 import com.rag.agent.services.DocumentProcessor.DocumentChunk;
-import com.rag.agent.services.VectorService.SearchResult;
 
 import java.io.InputStream;
 import java.util.List;
@@ -21,6 +20,13 @@ public class RAGService {
         this.vectorService = new VectorService();
     }
     
+    public RAGService(VectorService sharedVectorService) {
+        this.s3Service = new S3Service();
+        this.documentProcessor = new DocumentProcessor();
+        this.embeddingService = new EmbeddingService();
+        this.vectorService = sharedVectorService;  // Use shared instance
+    }
+    
     /**
      * Process an uploaded document: extract text, chunk it, generate embeddings, and index in vector store
      */
@@ -29,32 +35,33 @@ public class RAGService {
             try {
                 System.out.println("Processing document: " + fileName + " from " + bucket + "/" + key);
                 
-                // Step 1: Download and extract text from S3
+                // Step 1: Download and extract text with page information from S3
                 InputStream documentStream = s3Service.getObjectContent(bucket, key);
-                String extractedText = documentProcessor.extractText(documentStream, fileName);
+                DocumentProcessor.PageAwareDocument pageAwareDoc = documentProcessor.extractTextWithPageInfo(documentStream, fileName);
                 
-                if (extractedText.trim().isEmpty()) {
+                if (pageAwareDoc.getPages().isEmpty()) {
                     System.err.println("No text extracted from document: " + fileName);
                     return;
                 }
                 
-                System.out.println("Extracted " + extractedText.length() + " characters from " + fileName);
+                System.out.println("Extracted content from " + pageAwareDoc.getPageCount() + " pages in " + fileName);
                 
-                // Step 2: Chunk the document
+                // Step 2: Create page-aware chunks
                 String documentId = key.replace("/", "_");
-                List<DocumentChunk> chunks = documentProcessor.chunkDocument(extractedText, documentId, fileName);
+                List<DocumentChunk> chunks = documentProcessor.createPageAwareChunks(pageAwareDoc, documentId);
                 
                 if (chunks.isEmpty()) {
                     System.err.println("No chunks created for document: " + fileName);
                     return;
                 }
                 
-                System.out.println("Created " + chunks.size() + " chunks for " + fileName);
+                System.out.println("Created " + chunks.size() + " page-aware chunks for " + fileName);
                 
                 // Step 3: Index chunks with Google ADK agents (no embeddings needed)
                 vectorService.indexDocumentChunks(chunks);
                 
-                System.out.println("Successfully processed document: " + fileName);
+                System.out.println("Successfully processed document with page awareness: " + fileName);
+                System.out.println("Document is ready for page-specific queries!");
                 
             } catch (Exception e) {
                 System.err.println("Error processing document " + fileName + ": " + e.getMessage());
@@ -72,7 +79,7 @@ public class RAGService {
             System.out.println("Processing query with Google ADK agents: " + query);
             
             // Step 1: Use Google ADK agent to search for relevant chunks (no embeddings needed)
-            List<SearchResult> searchResults = vectorService.searchWithAdkAgent(query, 5);
+            List<DocumentChunk> searchResults = vectorService.searchWithAdkAgent(query, 5);
             
             if (searchResults.isEmpty()) {
                 return new QueryResponse(
@@ -90,7 +97,7 @@ public class RAGService {
             
             // Step 4: Prepare citations
             List<Citation> citations = searchResults.stream()
-                .map(result -> new Citation(result.getFileName(), result.getScore()))
+                .map(result -> new Citation(result.getFileName(), 1.0))
                 .collect(Collectors.toList());
             
             System.out.println("Successfully answered query with Google ADK using " + citations.size() + " citations");
@@ -108,15 +115,16 @@ public class RAGService {
         }
     }
     
-    private String buildContextFromResults(List<SearchResult> results) {
+    private String buildContextFromResults(List<DocumentChunk> results) {
         StringBuilder context = new StringBuilder();
         
         for (int i = 0; i < results.size(); i++) {
-            SearchResult result = results.get(i);
-            context.append("Document: ").append(result.getFileName()).append("\\n");
-            context.append("Content: ").append(result.getContent()).append("\\n");
+            DocumentChunk result = results.get(i);
+            context.append("Document: ").append(result.getFileName()).append("\n");
+            context.append("Page: ").append(result.getPageNumber()).append("\n");
+            context.append("Content: ").append(result.getContent()).append("\n");
             if (i < results.size() - 1) {
-                context.append("\\n---\\n\\n");
+                context.append("\n---\n\n");
             }
         }
         

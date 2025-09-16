@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RAG Upload Debug</title>
+</head>
+<body>
+    <h1>RAG Upload Debug Page</h1>
+    <div id="status"></div>
+    <div id="config"></div>
+    <input type="file" id="testFile">
+    <button onclick="testUpload()">Test Upload</button>
+    <div id="result"></div>
+
+    <script>
+        const status = document.getElementById('status');
+        const config = document.getElementById('config');
+        const result = document.getElementById('result');
+        
+        // Test 1: Load config
+        fetch('/config.json')
+            .then(response => {
+                status.innerHTML = `Config fetch status: ${response.status}`;
+                return response.json();
+            })
+            .then(data => {
+                config.innerHTML = `Config data: ${JSON.stringify(data)}`;
+                window.apiUrl = data.apiBaseUrl;
+            })
+            .catch(error => {
+                config.innerHTML = `Config error: ${error.message}`;
+            });
+
+        async function testUpload() {
+            const fileInput = document.getElementById('testFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                result.innerHTML = 'Please select a file first';
+                return;
+            }
+            
+            if (!window.apiUrl) {
+                result.innerHTML = 'API URL not loaded from config';
+                return;
+            }
+            
+            try {
+                result.innerHTML = 'Testing upload initiate...';
+                
+                const response = await fetch(`${window.apiUrl}/upload/initiate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fileName: file.name,
+                        contentType: file.type || 'application/octet-stream'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    result.innerHTML = `SUCCESS: ${JSON.stringify(data)}`;
+                } else {
+                    result.innerHTML = `FAILED: ${response.status} ${response.statusText}`;
+                }
+            } catch (error) {
+                result.innerHTML = `ERROR: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

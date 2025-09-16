@@ -6,5 +6,3 @@ retrieval_top_k            = 5
 ecs_task_cpu              = 512
 ecs_task_memory           = 1024
 ecs_desired_count         = 1
-lambda_timeout            = 300
-lambda_memory_size        = 512

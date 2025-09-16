@@ -24,11 +24,14 @@ public class EmbeddingService {
     private static final String EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0";
     
     public EmbeddingService() {
-        System.out.println("Initializing EmbeddingService for ap-southeast-2 Sydney region");
+        String regionEnv = System.getenv("AWS_REGION");
+        Region region = regionEnv != null ? Region.of(regionEnv) : Region.AP_SOUTHEAST_2;
         
-        // Initialize AWS Bedrock client for Titan embeddings in Sydney region
+        System.out.println("Initializing EmbeddingService for region: " + region);
+        
+        // Initialize AWS Bedrock client for Titan embeddings
         this.bedrockClient = BedrockRuntimeClient.builder()
-            .region(Region.AP_SOUTHEAST_2) // Using Sydney region for this POC
+            .region(region)
             .credentialsProvider(DefaultCredentialsProvider.create())
             .build();
             
@@ -47,7 +50,7 @@ public class EmbeddingService {
         this.objectMapper = new ObjectMapper();
         
         System.out.println("EmbeddingService initialized:");
-        System.out.println("- Region: ap-southeast-2 Sydney");
+        System.out.println("- Region: " + region);
         System.out.println("- Titan Embeddings: " + EMBEDDING_MODEL_ID);
         System.out.println("- Claude via Google ADK → LiteLLM Proxy → Bedrock Claude");
         System.out.println("- LiteLLM Proxy URL: " + (liteLLMProxyUrl != null ? liteLLMProxyUrl : "Not configured"));
@@ -115,7 +118,7 @@ public class EmbeddingService {
             
             // Create request body for LiteLLM proxy (OpenAI-compatible API)
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", "claude-3.5-sonnet-20241022"); // Model via LiteLLM
+            requestBody.put("model", "claude-3-sonnet-20240229"); // Model via LiteLLM
             requestBody.put("messages", new Object[]{
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)
@@ -176,7 +179,7 @@ public class EmbeddingService {
             String jsonPayload = objectMapper.writeValueAsString(requestBody);
             
             InvokeModelRequest request = InvokeModelRequest.builder()
-                .modelId("anthropic.claude-sonnet-4-20250514-v1:0")
+                .modelId("anthropic.claude-3-sonnet-20240229-v1:0")
                 .body(SdkBytes.fromUtf8String(jsonPayload))
                 .contentType("application/json")
                 .accept("application/json")

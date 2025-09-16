@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.rag.agent.services.*;
+import com.rag.agent.agent.DocumentChatbotAgent;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.IOException;
@@ -24,11 +25,18 @@ public class Main {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static S3Service s3Service;
     private static RAGService ragService;
+    private static DocumentChatbotAgent chatbotAgent;
     
     public static void main(String[] args) throws IOException {
-        // Initialize services
+        // Initialize services with shared VectorService instance
         s3Service = new S3Service();
-        ragService = new RAGService();
+        
+        // Create shared VectorService instance for both RAG processing and chatbot
+        VectorService sharedVectorService = new VectorService();
+        ragService = new RAGService(sharedVectorService);  // Pass shared instance
+        chatbotAgent = new DocumentChatbotAgent(sharedVectorService);
+        
+        System.out.println("Initialized Google ADK Document Chatbot Agent");
         
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
         
@@ -36,15 +44,17 @@ public class Main {
         server.createContext("/upload/initiate", new UploadInitiateHandler());
         server.createContext("/upload/presignPart", new UploadPresignPartHandler());
         server.createContext("/upload/complete", new UploadCompleteHandler());
-        server.createContext("/query", new QueryHandler());
+        server.createContext("/query", new QueryHandler()); // Legacy endpoint
+        server.createContext("/chat", new DocumentChatHandler()); // New document chatbot endpoint
         
         server.setExecutor(Executors.newFixedThreadPool(10));
         server.start();
         
-        System.out.println("RAG Agent server started on port 8080");
+        System.out.println("Document Chatbot with Google ADK started on port 8080");
         System.out.println("Health check endpoint: http://localhost:8080/health");
         System.out.println("Upload initiate endpoint: http://localhost:8080/upload/initiate");
-        System.out.println("Query endpoint: http://localhost:8080/query");
+        System.out.println("Document Chat endpoint: http://localhost:8080/chat");
+        System.out.println("Legacy Query endpoint: http://localhost:8080/query");
         
         // Add shutdown hook to clean up resources
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -96,8 +106,18 @@ public class Main {
                 return;
             }
             
-            String response = "{\"status\":\"healthy\",\"service\":\"rag-agent\",\"timestamp\":\"" + 
-                java.time.Instant.now().toString() + "\"}";
+            // Enhanced health check for Google ADK chatbot
+            Map<String, Object> healthStatus = new HashMap<>();
+            healthStatus.put("status", "healthy");
+            healthStatus.put("service", "document-chatbot-google-adk");
+            healthStatus.put("timestamp", java.time.Instant.now().toString());
+            healthStatus.put("components", Map.of(
+                "s3Service", s3Service != null ? "ready" : "not_initialized",
+                "ragService", ragService != null ? "ready" : "not_initialized", 
+                "chatbotAgent", chatbotAgent != null ? "ready" : "not_initialized"
+            ));
+            
+            String response = objectMapper.writeValueAsString(healthStatus);
             sendResponse(exchange, 200, response);
         }
     }
@@ -223,13 +243,15 @@ public class Main {
                 // Extract filename from key
                 String fileName = key.substring(key.lastIndexOf('/') + 1);
                 
-                // Start document processing asynchronously
+                // Start enhanced document processing asynchronously with page awareness
+                System.out.println("Starting page-aware document processing with Google ADK for: " + fileName);
                 CompletableFuture<Void> processingFuture = ragService.processDocument(bucket, key, fileName);
                 processingFuture.whenComplete((result, throwable) -> {
                     if (throwable != null) {
                         System.err.println("Document processing failed for " + fileName + ": " + throwable.getMessage());
                     } else {
-                        System.out.println("Document processing completed for " + fileName);
+                        System.out.println("Page-aware document processing completed for " + fileName);
+                        System.out.println("Document is now ready for page-specific queries (e.g., 'What does page 5 describe?')");
                     }
                 });
                 
@@ -314,5 +336,85 @@ public class Main {
             }
         }
         return params;
+    }
+    
+    /**
+     * Enhanced Document Chat Handler using Google ADK agents
+     * Supports page-specific queries like "What does page 23 describe?"
+     */
+    static class DocumentChatHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                handleOptions(exchange);
+                return;
+            }
+            
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                sendResponse(exchange, 405, "{\"error\":\"Method not allowed\"}");
+                return;
+            }
+            
+            try {
+                String requestBody = readRequestBody(exchange);
+                JsonNode jsonNode = objectMapper.readTree(requestBody);
+                
+                // Support both "query" and "message" field names for flexibility
+                String userQuery = null;
+                if (jsonNode.has("query")) {
+                    userQuery = jsonNode.get("query").asText();
+                } else if (jsonNode.has("message")) {
+                    userQuery = jsonNode.get("message").asText();
+                } else {
+                    throw new RuntimeException("Request must contain either 'query' or 'message' field");
+                }
+                
+                System.out.println("Processing document chat query with Google ADK: " + userQuery);
+                
+                // Use Google ADK Document Chatbot Agent for processing
+                DocumentChatbotAgent.ChatbotResponse chatResponse = chatbotAgent.processQuery(userQuery);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("answer", chatResponse.getAnswer());
+                response.put("success", chatResponse.isSuccess());
+                response.put("timestamp", chatResponse.getTimestamp());
+                
+                // Include source information with page details
+                List<Map<String, Object>> sources = new ArrayList<>();
+                for (DocumentProcessor.DocumentChunk chunk : chatResponse.getSources()) {
+                    Map<String, Object> source = new HashMap<>();
+                    source.put("fileName", chunk.getFileName());
+                    source.put("pageNumber", chunk.getPageNumber());
+                    source.put("chunkType", chunk.getChunkType());
+                    source.put("preview", chunk.getContent().length() > 200 ? 
+                        chunk.getContent().substring(0, 200) + "..." : chunk.getContent());
+                    sources.add(source);
+                }
+                response.put("sources", sources);
+                
+                // Include query analysis if available
+                if (chatResponse.getAnalysis() != null) {
+                    Map<String, Object> analysis = new HashMap<>();
+                    analysis.put("queryType", chatResponse.getAnalysis().getQueryType().toString());
+                    analysis.put("pageNumbers", chatResponse.getAnalysis().getPageNumbers());
+                    response.put("analysis", analysis);
+                }
+                
+                String jsonResponse = objectMapper.writeValueAsString(response);
+                sendResponse(exchange, 200, jsonResponse);
+                
+            } catch (Exception e) {
+                System.err.println("Error in document chat handler: " + e.getMessage());
+                e.printStackTrace();
+                
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Failed to process your question about the document");
+                errorResponse.put("success", false);
+                errorResponse.put("details", e.getMessage());
+                
+                String jsonResponse = objectMapper.writeValueAsString(errorResponse);
+                sendResponse(exchange, 500, jsonResponse);
+            }
+        }
     }
 }

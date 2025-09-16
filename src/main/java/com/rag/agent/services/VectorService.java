@@ -11,21 +11,28 @@ import io.reactivex.rxjava3.core.Flowable;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class VectorService {
     private final Map<String, DocumentChunk> documentStore;
+    private final Map<Integer, List<DocumentChunk>> pageIndex; // NEW: Page-based index
+    private final Map<String, List<DocumentChunk>> documentIndex; // NEW: Document-based index
     private final LlmAgent searchAgent;
     private final CustomLiteLlmModel llmModel;
     
     public VectorService() {
         this.documentStore = new ConcurrentHashMap<>();
+        this.pageIndex = new ConcurrentHashMap<>();
+        this.documentIndex = new ConcurrentHashMap<>();
         this.llmModel = new CustomLiteLlmModel();
         
         // Create Google ADK agent for document search and retrieval
         this.searchAgent = LlmAgent.builder()
+            .name("anthropic.claude-3-sonnet-20240229-v1:0")
             .model(llmModel)
             .instruction("You are a document search assistant. Given a query and a list of document chunks, " +
                         "identify and return the most relevant chunks that can help answer the query. " +
@@ -48,18 +55,43 @@ public class VectorService {
         for (DocumentProcessor.DocumentChunk chunk : chunks) {
             // Store chunks in memory for Google ADK agent processing
             documentStore.put(chunk.getChunkId(), chunk);
+            
+            // Build page index for fast page-specific lookups
+            pageIndex.computeIfAbsent(chunk.getPageNumber(), k -> new ArrayList<>()).add(chunk);
+            
+            // Build document index for document-specific operations
+            documentIndex.computeIfAbsent(chunk.getDocumentId(), k -> new ArrayList<>()).add(chunk);
         }
         
         System.out.println("Successfully indexed " + chunks.size() + " document chunks with Google ADK");
         System.out.println("Total chunks available to ADK agents: " + documentStore.size());
+        System.out.println("Pages indexed: " + pageIndex.size());
+        System.out.println("Documents indexed: " + documentIndex.size());
     }
     
-    public List<SearchResult> searchSimilarChunks(float[] queryEmbedding, int topK) throws IOException {
-        // Use Google ADK agent for intelligent document search instead of embeddings
-        return searchWithAdkAgent("", topK);
+    /**
+     * Get chunks by specific page numbers - NEW method for page-aware queries
+     */
+    public List<DocumentChunk> getChunksByPages(List<Integer> pageNumbers) {
+        List<DocumentChunk> pageChunks = new ArrayList<>();
+        
+        for (Integer pageNum : pageNumbers) {
+            List<DocumentChunk> chunks = pageIndex.get(pageNum);
+            if (chunks != null) {
+                pageChunks.addAll(chunks);
+                System.out.println("Found " + chunks.size() + " chunks on page " + pageNum);
+            } else {
+                System.out.println("No content found for page " + pageNum);
+            }
+        }
+        
+        return pageChunks.stream()
+            .sorted(Comparator.comparingInt(DocumentChunk::getPageNumber))
+            .collect(Collectors.toList());
     }
     
-    public List<SearchResult> searchWithAdkAgent(String query, int topK) {
+    
+    public List<DocumentChunk> searchWithAdkAgent(String query, int topK) {
         if (documentStore.isEmpty()) {
             System.out.println("No documents available for search");
             return new ArrayList<>();
@@ -122,7 +154,7 @@ public class VectorService {
             }
             
             // Parse the agent's response to get chunk numbers
-            List<SearchResult> results = parseAgentSearchResponse(agentResponse, chunkIndex, query);
+            List<DocumentChunk> results = parseAgentSearchResponse(agentResponse, chunkIndex, query);
             
             System.out.println("Google ADK agent found " + results.size() + " relevant chunks");
             return results;
@@ -136,8 +168,8 @@ public class VectorService {
         }
     }
     
-    private List<SearchResult> parseAgentSearchResponse(String agentResponse, Map<Integer, DocumentChunk> chunkIndex, String query) {
-        List<SearchResult> results = new ArrayList<>();
+    private List<DocumentChunk> parseAgentSearchResponse(String agentResponse, Map<Integer, DocumentChunk> chunkIndex, String query) {
+        List<DocumentChunk> results = new ArrayList<>();
         
         try {
             // Extract numbers from the agent's response
@@ -149,15 +181,7 @@ public class VectorService {
                     int chunkNum = Integer.parseInt(part.trim());
                     DocumentChunk chunk = chunkIndex.get(chunkNum);
                     if (chunk != null) {
-                        SearchResult result = new SearchResult(
-                            chunk.getChunkId(),
-                            chunk.getDocumentId(),
-                            chunk.getFileName(),
-                            chunk.getContent(),
-                            score
-                        );
-                        results.add(result);
-                        score -= 0.1; // Decrease score for ranking
+                        results.add(chunk);
                     }
                 } catch (NumberFormatException e) {
                     // Skip invalid numbers
@@ -175,10 +199,10 @@ public class VectorService {
         return results;
     }
     
-    private List<SearchResult> fallbackKeywordSearch(String query, int topK) {
+    private List<DocumentChunk> fallbackKeywordSearch(String query, int topK) {
         System.out.println("Using fallback keyword search for: " + query);
         
-        List<SearchResult> results = new ArrayList<>();
+        List<DocumentChunk> results = new ArrayList<>();
         String[] queryWords = query.toLowerCase().split("\\s+");
         
         for (DocumentChunk chunk : documentStore.values()) {
@@ -192,46 +216,17 @@ public class VectorService {
             }
             
             if (score > 0) {
-                SearchResult result = new SearchResult(
-                    chunk.getChunkId(),
-                    chunk.getDocumentId(),
-                    chunk.getFileName(),
-                    chunk.getContent(),
-                    score
-                );
-                results.add(result);
+                results.add(chunk);
             }
         }
         
-        results.sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
+        // Sort by page number for consistent results
+        results.sort(Comparator.comparingInt(DocumentChunk::getPageNumber));
         return results.subList(0, Math.min(topK, results.size()));
     }
     
     public void close() throws IOException {
         // No resources to close with Google ADK solution
         System.out.println("VectorService with Google ADK agents closed successfully");
-    }
-    
-    public static class SearchResult {
-        private final String chunkId;
-        private final String documentId;
-        private final String fileName;
-        private final String content;
-        private final double score;
-        
-        public SearchResult(String chunkId, String documentId, String fileName, String content, double score) {
-            this.chunkId = chunkId;
-            this.documentId = documentId;
-            this.fileName = fileName;
-            this.content = content;
-            this.score = score;
-        }
-        
-        // Getters
-        public String getChunkId() { return chunkId; }
-        public String getDocumentId() { return documentId; }
-        public String getFileName() { return fileName; }
-        public String getContent() { return content; }
-        public double getScore() { return score; }
     }
 }

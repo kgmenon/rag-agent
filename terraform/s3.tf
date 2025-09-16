@@ -18,25 +18,7 @@ resource "aws_s3_bucket" "ui" {
   }
 }
 
-resource "aws_s3_bucket" "litellm_config" {
-  bucket = "${var.project_name}-${var.environment}-litellm-config-${random_string.bucket_suffix.result}"
 
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-litellm-config"
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-resource "aws_s3_bucket" "lambda_deployments" {
-  bucket = "${var.project_name}-${var.environment}-lambda-deployments-${random_string.bucket_suffix.result}"
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-lambda-deployments"
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
 
 resource "random_string" "bucket_suffix" {
   length  = 8
@@ -51,12 +33,6 @@ resource "aws_s3_bucket_versioning" "uploads" {
   }
 }
 
-resource "aws_s3_bucket_versioning" "litellm_config" {
-  bucket = aws_s3_bucket.litellm_config.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
 
 resource "aws_s3_bucket_cors_configuration" "uploads" {
   bucket = aws_s3_bucket.uploads.id
@@ -65,6 +41,7 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "POST", "PUT", "DELETE", "HEAD"]
     allowed_origins = ["*"]
+    expose_headers = ["ETag"]
     max_age_seconds = 3000
   }
 }
@@ -194,13 +171,3 @@ resource "aws_s3_object" "ui_config" {
   depends_on = [aws_s3_bucket_policy.ui, aws_lb.main]
 }
 
-resource "aws_s3_object" "litellm_config" {
-  bucket  = aws_s3_bucket.litellm_config.id
-  key     = "config.yaml"
-  content = var.litellm_config
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}

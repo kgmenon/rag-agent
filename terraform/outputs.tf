@@ -18,20 +18,12 @@ output "uploads_bucket_name" {
   value       = aws_s3_bucket.uploads.id
 }
 
-output "opensearch_endpoint" {
-  description = "OpenSearch Serverless collection endpoint"
-  value       = aws_opensearchserverless_collection.documents.collection_endpoint
-}
+# OpenSearch removed - using Google ADK in-memory solution
+# output "opensearch_endpoint" {
+#   description = "OpenSearch Serverless collection endpoint"  
+#   value       = aws_opensearchserverless_collection.documents.collection_endpoint
+# }
 
-output "litellm_endpoint" {
-  description = "LiteLLM proxy endpoint (internal)"
-  value       = "http://litellm.${var.project_name}.local:4000"
-}
-
-output "litellm_config_bucket" {
-  description = "Name of the LiteLLM config S3 bucket"
-  value       = aws_s3_bucket.litellm_config.id
-}
 
 output "vpc_id" {
   description = "ID of the VPC"
@@ -63,6 +55,7 @@ output "rag_service_endpoints" {
     base_url   = "http://${aws_lb.main.dns_name}"
     upload_url = "http://${aws_lb.main.dns_name}/upload"
     query_url  = "http://${aws_lb.main.dns_name}/query"
+    chat_url   = "http://${aws_lb.main.dns_name}/chat"
     health_url = "http://${aws_lb.main.dns_name}/health"
   }
 }
@@ -71,8 +64,8 @@ output "infrastructure_info" {
   description = "Key infrastructure information"
   value = {
     vpc_id               = aws_vpc.main.id
-    opensearch_endpoint  = aws_opensearchserverless_collection.documents.collection_endpoint
     upload_bucket       = aws_s3_bucket.uploads.id
     load_balancer_dns   = aws_lb.main.dns_name
+    chat_endpoint       = "http://${aws_lb.main.dns_name}/chat"
   }
 }
