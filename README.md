@@ -64,7 +64,7 @@ graph TB
     end
     
     %% Internet Gateway
-    IGW[🌐 Internet Gateway<br/>Public Access Point]
+    IGW[🌐 Internet Gateway - Public Access Point]
     
     %% AWS Cloud Infrastructure
     subgraph "☁️ AWS Cloud Infrastructure (ap-southeast-2)"
@@ -74,20 +74,33 @@ graph TB
             
             %% Public Subnet Layer
             subgraph "🌍 Public Subnets (Multi-AZ)"
-                ALB[⚖️ Application Load Balancer<br/>rag-agent-poc-alb<br/>Port 80 → 8080<br/>HTTP Only]
-                NAT1[🚪 NAT Gateway AZ-1<br/>10.0.1.0/24]
-                NAT2[🚪 NAT Gateway AZ-2<br/>10.0.2.0/24]
+                ALB["⚖️ Application Load Balancer
+                rag-agent-poc-alb
+                Port 80 → 8080
+                HTTP Only"]
+                NAT1["🚪 NAT Gateway AZ-1
+                10.0.1.0/24"]
+                NAT2["🚪 NAT Gateway AZ-2
+                10.0.2.0/24"]
             end
             
             %% Private Subnet Layer
             subgraph "🔒 Private Subnets (Secure Zone)"
-                EC2[🖥️ EC2 Instance<br/>t3.medium<br/>Java 17 + JAR<br/>Port 8080<br/>Google ADK App]
+                EC2["🖥️ EC2 Instance
+                t3.medium
+                Java 17 + JAR
+                Port 8080
+                Google ADK App"]
             end
             
             %% Security Groups
             subgraph "🛡️ Security Groups"
-                SG_ALB[🔐 ALB Security Group<br/>Inbound: Port 80 (0.0.0.0/0)<br/>Outbound: Port 8080 (EC2)]
-                SG_EC2[🔐 EC2 Security Group<br/>Inbound: Port 8080 (ALB only)<br/>Outbound: All (for AWS APIs)]
+                SG_ALB["🔐 ALB Security Group
+                Inbound: Port 80 (0.0.0.0/0)
+                Outbound: Port 8080 (EC2)"]
+                SG_EC2["🔐 EC2 Security Group
+                Inbound: Port 8080 (ALB only)
+                Outbound: All (for AWS APIs)"]
             end
         end
         
@@ -96,34 +109,57 @@ graph TB
             
             %% Storage Services
             subgraph "🗄️ Storage Services"
-                S3_UPLOADS[🪣 S3 Bucket<br/>rag-agent-poc-uploads<br/>Document Storage<br/>Multipart Upload]
-                S3_UI[🪣 S3 Bucket<br/>rag-agent-poc-ui<br/>Static Website<br/>HTML/CSS/JS]
+                S3_UPLOADS["🪣 S3 Bucket
+                rag-agent-poc-uploads
+                Document Storage
+                Multipart Upload"]
+                S3_UI["🪣 S3 Bucket
+                rag-agent-poc-ui
+                Static Website
+                HTML/CSS/JS"]
             end
             
             %% AI & ML Services
             subgraph "🤖 AI & ML Services"
-                BEDROCK[🧠 AWS Bedrock<br/>Claude 3 Sonnet<br/>anthropic.claude-3-sonnet-20240229-v1:0<br/>Direct API Integration]
-                EMBEDDINGS[🔤 Bedrock Embeddings<br/>amazon.titan-embed-text-v2<br/>1536 dimensions]
+                BEDROCK["🧠 AWS Bedrock
+                Claude 3 Sonnet
+                anthropic.claude-3-sonnet-20240229-v1:0
+                Direct API Integration"]
+                EMBEDDINGS["🔤 Bedrock Embeddings
+                amazon.titan-embed-text-v2
+                1536 dimensions"]
             end
             
             %% Monitoring Services
             subgraph "📊 Monitoring & Logging"
-                CW_LOGS[📋 CloudWatch Logs<br/>/ec2/rag-agent/application<br/>/ec2/rag-agent/error]
-                CW_AGENT[📈 CloudWatch Agent<br/>Log Collection<br/>System Metrics]
+                CW_LOGS["📋 CloudWatch Logs
+                /ec2/rag-agent/application
+                /ec2/rag-agent/error"]
+                CW_AGENT["📈 CloudWatch Agent
+                Log Collection
+                System Metrics"]
             end
         end
         
         %% IAM Security Layer
         subgraph "👤 IAM Security & Permissions"
-            IAM_ROLE[🔑 EC2 Instance Role<br/>rag-agent-instance-role]
-            IAM_POLICY[📜 IAM Policies<br/>• S3 Read/Write Access<br/>• Bedrock InvokeModel<br/>• CloudWatch Logs Write]
+            IAM_ROLE["🔑 EC2 Instance Role
+            rag-agent-instance-role"]
+            IAM_POLICY["📜 IAM Policies
+            • S3 Read/Write Access
+            • Bedrock InvokeModel
+            • CloudWatch Logs Write"]
         end
     end
     
     %% External Dependencies
     subgraph "📦 External Dependencies"
-        MAVEN[📚 Maven Central<br/>Google ADK Library<br/>com.google.adk:google-adk:0.2.0]
-        INTERNET[🌐 Internet<br/>Maven Dependencies<br/>AWS API Endpoints]
+        MAVEN["📚 Maven Central
+        Google ADK Library
+        com.google.adk:google-adk:0.2.0"]
+        INTERNET["🌐 Internet
+        Maven Dependencies
+        AWS API Endpoints"]
     end
     
     %% Connection Flows
